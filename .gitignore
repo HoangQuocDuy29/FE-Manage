@@ -1,0 +1,15 @@
+# Ignore node_modules ở cả 2 cấp
+node_modules/
+vite-project/node_modules/
+
+# Bỏ thư mục build
+dist/
+vite-project/dist/
+
+# Bỏ thư mục modul nếu là tạm
+vite-project/modul/
+
+# Ignore file môi trường, log và IDE
+.env
+*.log
+.vscode/
