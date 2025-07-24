@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3030,
+    proxy: {
+      '/api': 'http://localhost:3000', // ✅ Chuyển tiếp API sang backend
+    },
   },
   resolve: {
     alias: {

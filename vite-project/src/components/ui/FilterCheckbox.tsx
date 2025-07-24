@@ -1,42 +1,30 @@
-import { useState } from "react";
+type FilterKeys = "assignee" | "priority" | "deadline";
 
-export default function FilterCheckbox() {
-  const [filters, setFilters] = useState({
-    assignee: true,
-    priority: true,
-    deadline: true,
-  });
+type Props = {
+  filters: Record<FilterKeys, boolean>;
+  setFilters: React.Dispatch<React.SetStateAction<Record<FilterKeys, boolean>>>;
+};
 
-  const handleChange = (field: string) => {
-    setFilters({ ...filters, [field]: !filters[field as keyof typeof filters] });
+export default function FilterCheckbox({ filters, setFilters }: Props) {
+  const handleChange = (field: FilterKeys) => {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
   };
 
   return (
     <div className="border p-3 rounded flex space-x-4 items-center">
-      <label>
-        <input
-          type="checkbox"
-          checked={filters.assignee}
-          onChange={() => handleChange("assignee")}
-        />{" "}
-        Assignee
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={filters.priority}
-          onChange={() => handleChange("priority")}
-        />{" "}
-        Priority
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={filters.deadline}
-          onChange={() => handleChange("deadline")}
-        />{" "}
-        Deadline
-      </label>
+      {(["assignee", "priority", "deadline"] as FilterKeys[]).map((key) => (
+        <label key={key}>
+          <input
+            type="checkbox"
+            checked={filters[key]}
+            onChange={() => handleChange(key)}
+          />{" "}
+          {key.charAt(0).toUpperCase() + key.slice(1)}
+        </label>
+      ))}
     </div>
   );
 }
