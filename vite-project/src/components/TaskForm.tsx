@@ -123,7 +123,7 @@ export default function TaskForm({ onSuccess }: Props) {
         )}
       </div>
 
-      <Button type="submit">Thêm công việc</Button>
+      <Button type="submit">Add Task</Button>
       {message && <p className="mt-4 text-green-600">{message}</p>}
     </form>
   );

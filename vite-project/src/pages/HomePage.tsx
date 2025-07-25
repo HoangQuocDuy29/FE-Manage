@@ -7,6 +7,7 @@ import FilterCheckbox from "@/components/ui/FilterCheckbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, X } from "lucide-react";
+import SearchBar from "@/components/ui/SearchBar";
 
 export default function HomePage() {
   const setTasks = useTaskStore((state) => state.setTasks);
@@ -14,6 +15,7 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
+  
 
   const [filters, setFilters] = useState({
     assignee: false,
@@ -46,21 +48,27 @@ export default function HomePage() {
   }, [filters]);
 
   const handleSearch = async () => {
-    const keyword = searchTerm.trim();
-    if (!keyword) return;
+  const keyword = searchTerm.trim();
 
-    setLoading(true);
-    try {
-      const response = await searchTasks(keyword);
-      setTasks(response.data);
-      setIsSearching(true);
-    } catch (error) {
-      console.error("Lỗi khi tìm kiếm:", error);
-      setTasks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Nếu keyword trống hoặc toàn khoảng trắng, thì không gọi API
+  if (!keyword || keyword.length === 0) {
+    console.warn("⛔ Không tìm kiếm với chuỗi rỗng");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const response = await searchTasks(keyword);
+    setTasks(response.data);
+    setIsSearching(true);
+  } catch (error) {
+    console.error("Lỗi khi tìm kiếm:", error);
+    setTasks([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleClear = () => {
     setSearchTerm("");
@@ -75,13 +83,13 @@ export default function HomePage() {
           onClick={() => setShowForm(!showForm)}
           className="bg-red-100 border border-red-500 text-red-600 font-semibold px-4 py-2 rounded"
         >
-          {showForm ? "Đóng" : "Create"}
+          {showForm ? "Close" : "Create"}
         </button>
 
         {/* Search bar */}
         <div className="flex items-center gap-2 flex-1">
           <Input
-            placeholder="Tìm theo ID hoặc tên người nhận..."
+            placeholder="Search by ID or Assignee..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -112,7 +120,7 @@ export default function HomePage() {
 
       {/* Danh sách công việc */}
       {loading ? (
-        <p className="text-gray-500">Đang tải...</p>
+        <p className="text-gray-500">Loading...</p>
       ) : (
         <TaskList />
       )}

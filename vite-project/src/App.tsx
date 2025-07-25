@@ -1,9 +1,4 @@
 import HomePage from "@/pages/HomePage";
-import TaskForm from "@/components/TaskForm";
-import TaskList from "@/components/TaskList";
-import FilterBar from "@/components/FilterBar";
-
-
 
 function App() {
   return (
