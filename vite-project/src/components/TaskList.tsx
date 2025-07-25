@@ -39,9 +39,9 @@ export default function TaskList() {
     }
   };
 
-  useEffect(() => {
-    loadAllTasks();
-  }, []);
+  // useEffect(() => {
+  //   loadAllTasks();
+  // }, []);
 
   const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
