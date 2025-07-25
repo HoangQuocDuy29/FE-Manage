@@ -3,11 +3,10 @@ import { useTaskStore } from "@/store/taskStore";
 import { fetchTasks, searchTasks } from "@/services/api";
 import TaskForm from "@/components/TaskForm";
 import TaskList from "@/components/TaskList";
-import FilterCheckbox from "@/components/ui/FilterCheckbox";
+import FilterDropdown from "@/components/FilterDropdown"; // Import FilterDropdown
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, X } from "lucide-react";
-import SearchBar from "@/components/ui/SearchBar";
 
 export default function HomePage() {
   const setTasks = useTaskStore((state) => state.setTasks);
@@ -15,12 +14,12 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [loading, setLoading] = useState(false);
-  
 
+  // State lưu trữ giá trị lọc
   const [filters, setFilters] = useState({
-    assignee: false,
-    priority: false,
-    deadline: false,
+    assignee: "",   // Filter assignee (ban đầu rỗng)
+    priority: "",   // Filter priority (ban đầu rỗng)
+    deadline: "",   // Filter deadline (ban đầu rỗng)
   });
 
   const loadAllTasks = async () => {
@@ -29,9 +28,9 @@ export default function HomePage() {
       const query = new URLSearchParams();
 
       // Thêm filter nếu có
-      if (filters.assignee) query.append("assignee", "true");
-      if (filters.priority) query.append("priority", "true");
-      if (filters.deadline) query.append("deadline", "true");
+      if (filters.assignee) query.append("assignee", filters.assignee);
+      if (filters.priority) query.append("priority", filters.priority);
+      if (filters.deadline) query.append("deadline", filters.deadline);
 
       const response = await fetchTasks(query.toString());
       setTasks(response.data);
@@ -45,30 +44,29 @@ export default function HomePage() {
 
   useEffect(() => {
     loadAllTasks();
-  }, [filters]);
+  }, [filters]); // Chạy lại khi filters thay đổi
 
   const handleSearch = async () => {
-  const keyword = searchTerm.trim();
+    const keyword = searchTerm.trim();
 
-  // Nếu keyword trống hoặc toàn khoảng trắng, thì không gọi API
-  if (!keyword || keyword.length === 0) {
-    console.warn("⛔ Không tìm kiếm với chuỗi rỗng");
-    return;
-  }
+    // Nếu keyword trống hoặc toàn khoảng trắng, thì không gọi API
+    if (!keyword || keyword.length === 0) {
+      console.warn("⛔ Không tìm kiếm với chuỗi rỗng");
+      return;
+    }
 
-  setLoading(true);
-  try {
-    const response = await searchTasks(keyword);
-    setTasks(response.data);
-    setIsSearching(true);
-  } catch (error) {
-    console.error("Lỗi khi tìm kiếm:", error);
-    setTasks([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
+    setLoading(true);
+    try {
+      const response = await searchTasks(keyword);
+      setTasks(response.data);
+      setIsSearching(true);
+    } catch (error) {
+      console.error("Lỗi khi tìm kiếm:", error);
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleClear = () => {
     setSearchTerm("");
@@ -105,7 +103,8 @@ export default function HomePage() {
           )}
         </div>
 
-        <FilterCheckbox filters={filters} setFilters={setFilters} />
+        {/* Filter Dropdown */}
+        <FilterDropdown filters={filters} setFilters={setFilters} assignees={["John Doe", "Jane Smith", "Alice Cooper"]} />
       </div>
 
       {/* Form thêm công việc */}
