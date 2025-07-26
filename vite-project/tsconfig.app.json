@@ -6,6 +6,8 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client"],  // ✅ hoặc thêm nếu bạn dùng Vite
 
     /* Bundler mode */
     "moduleResolution": "bundler",

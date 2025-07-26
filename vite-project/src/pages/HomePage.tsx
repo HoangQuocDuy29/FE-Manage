@@ -7,6 +7,7 @@ import FilterDropdown from "@/components/FilterDropdown"; // Import FilterDropdo
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, X } from "lucide-react";
+import api from "@/lib/axios";
 
 export default function HomePage() {
   const setTasks = useTaskStore((state) => state.setTasks);
@@ -41,6 +42,12 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+  // Kiểm tra token và gọi API mẫu
+  useEffect(() => {
+    api.get("/tasks/me")
+      .then(res => console.log(res.data))
+      .catch(err => console.error(err));
+  }, []);
 
   useEffect(() => {
     loadAllTasks();
