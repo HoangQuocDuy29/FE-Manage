@@ -5,7 +5,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-
+    "jsx": "react-jsx",
     /* Sửa ở đây */
     "moduleResolution": "node",
     "esModuleInterop": true,

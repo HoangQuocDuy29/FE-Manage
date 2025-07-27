@@ -1,11 +1,28 @@
-import { create } from "zustand";
+// 📁 FE: src/store/authStore.ts
+import { create } from 'zustand';
+import { setToken, clearToken } from '@/utils/token';
+
+type User = {
+  id: number;
+  email: string;
+};
 
 type AuthState = {
-  token: string | null;
-  setToken: (token: string) => void;
+  user: User | null;
+  setUser: (user: User | null, token?: string) => void;
+  logout: () => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  setToken: (token) => set({ token }),
+  user: null,
+  setUser: (user, token) => {
+    if (user && token) {
+      setToken(token);           // ✅ Lưu token vào localStorage
+    }
+    set({ user });                // ✅ Lưu user vào state
+  },
+  logout: () => {
+    clearToken();                 // ✅ Xóa token
+    set({ user: null });          // ✅ Xóa user
+  },
 }));

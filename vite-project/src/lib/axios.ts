@@ -1,15 +1,16 @@
-import axios from "axios";
+import axios from 'axios';
+import { getToken, clearToken } from '@/utils/token';
 
-// ✅ Tạo axios instance dùng chung
+// ✅ Tạo instance dùng chung
 const api = axios.create({
-  baseURL: "http://localhost:3000/api", // Nếu khác cổng thì sửa lại
+  baseURL: 'http://localhost:3000/api', // --> Gộp lại thành: http://localhost:3000/api/auth/login
   withCredentials: false,
 });
 
-// ✅ Interceptor gửi token
+// ✅ Interceptor: Gắn token vào request header
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = getToken(); // dùng từ utils/token.ts
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -18,14 +19,14 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Interceptor xử lý token hết hạn
+// ✅ Interceptor: Xử lý khi token hết hạn
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
     if (status === 401 || status === 403) {
-      localStorage.removeItem("token");
-      window.location.href = "/login"; // Chuyển về trang login
+      clearToken(); // xoá token dùng hàm utils
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

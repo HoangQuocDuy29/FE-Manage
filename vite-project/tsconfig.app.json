@@ -7,7 +7,8 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],  // ✅ hoặc thêm nếu bạn dùng Vite
+
+    "types": ["react", "react-dom","vite/client"],  // ✅ hoặc thêm nếu bạn dùng Vite
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -15,7 +16,6 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "jsx": "react-jsx",
 
     /* Linting */
     "strict": true,

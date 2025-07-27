@@ -1,5 +1,12 @@
-import axios from "axios";
+// FE: src/services/auth.ts
+import api from "@/lib/axios";
 
-export async function login(email: string, password: string) {
-  return axios.post("http://localhost:3000/api/auth/login", { email, password });
-}
+export const register = async (data: { email: string; password: string }) => {
+  const res = await api.post("/auth/register", data); 
+  return res.data;
+};
+
+export const login = async (data: { email: string; password: string }) => {
+  const res = await api.post("/auth/login", data); 
+  return res.data;
+};
