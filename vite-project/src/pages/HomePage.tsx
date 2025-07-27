@@ -42,12 +42,6 @@ export default function HomePage() {
       setLoading(false);
     }
   };
-  // Kiểm tra token và gọi API mẫu
-  useEffect(() => {
-    api.get("/tasks/me")
-      .then(res => console.log(res.data))
-      .catch(err => console.error(err));
-  }, []);
 
   useEffect(() => {
     loadAllTasks();

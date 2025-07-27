@@ -6,8 +6,8 @@ import App from './App.tsx';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter> {/* ✅ bọc App trong BrowserRouter */}
+    {/* ✅ bọc App trong BrowserRouter */}
       <App />
-    </BrowserRouter>
+    
   </StrictMode>
 );

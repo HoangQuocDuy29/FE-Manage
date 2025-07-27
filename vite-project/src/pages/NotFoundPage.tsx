@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
-export default function NotFoundPage() {
+const NotFoundPage = () => {
   const navigate = useNavigate();
 
   return (
@@ -35,4 +35,6 @@ export default function NotFoundPage() {
       </motion.button>
     </div>
   );
-}
+};
+
+export default NotFoundPage;
