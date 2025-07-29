@@ -1,15 +1,22 @@
-import type { JSX } from 'react'; // fix lỗi JSX.Element
+// 📁 FE: src/App.tsx
+import type { JSX } from 'react'; // Fix lỗi JSX.Element
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import HomePage from '@/pages/HomePage';
+import HomePage from '@/pages/DashBoard'; // Trang Admin Dashboard
 import NotFoundPage from '@/pages/NotFoundPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
+import MyTask from '@/pages/MyTask'; // Trang công việc cho User
 import { useAuthStore } from '@/store/authStore';
 import { Toaster } from '@/components/ui/toaster';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const user = useAuthStore((state) => state.user);
-  return user ? children : <Navigate to="/login" />;
+  return user ? children : <Navigate to="/login" />; // Nếu người dùng không có, chuyển đến login
+}
+
+function ProtectedAdminRoute({ children }: { children: JSX.Element }) {
+  const user = useAuthStore((state) => state.user);
+  return user && user.role === 'admin' ? children : <Navigate to="/mytask" />; // Kiểm tra role là admin
 }
 
 function App() {
@@ -21,7 +28,7 @@ function App() {
         </h1>
 
         <Routes>
-          {/* ✅ Trang chính (được bảo vệ) */}
+          {/* Trang chính, bảo vệ và phân quyền theo vai trò */}
           <Route
             path="/"
             element={
@@ -30,16 +37,36 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          {/* Route cho Admin, chỉ cho phép Admin vào trang Dashboard */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedAdminRoute>
+                <HomePage />
+              </ProtectedAdminRoute>
+            }
+          />
 
-          {/* 🔐 Auth */}
+          {/* Trang công việc cho User */}
+          <Route
+            path="/mytask"
+            element={
+              <ProtectedRoute>
+                <MyTask />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Auth Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* ❌ Route không tồn tại */}
+          {/* Route không tồn tại */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
 
-        {/* ✅ Hiển thị toast global */}
+        {/* Hiển thị thông báo toast toàn cục */}
         <Toaster />
       </div>
     </Router>

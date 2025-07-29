@@ -21,15 +21,28 @@ export default function LoginPage() {
 
   const setUser = useAuthStore((s) => s.setUser);
   const { toast } = useToast();
-  const navigate = useNavigate(); // ✅ dùng để chuyển route
+  const navigate = useNavigate(); // Dùng để điều hướng route sau khi đăng nhập
 
   const onSubmit = async (data: LoginForm) => {
     try {
       const res = await login(data);
-      setToken(res.token);
-      setUser(res.user);
+      console.log('Login Response:', res);  // Chú thích: Log phản hồi từ backend để kiểm tra dữ liệu trả về
+      setToken(res.token); // Lưu token vào localStorage hoặc cookie
+      setUser(res.user); // Lưu thông tin user vào state
       toast({ title: 'Đăng nhập thành công' });
-      navigate('/'); // ✅ chuyển về HomePage
+
+      // Kiểm tra role của người dùng và điều hướng đến trang tương ứng
+      if (res.user.role === 'admin') {  // Kiểm tra role là 'admin'
+        navigate('/dashboard');  // Điều hướng đến trang Dashboard nếu là admin
+      } else if (res.user.role === 'user') {  // Kiểm tra role là 'user'
+        navigate('/mytask');  // Điều hướng đến trang MyTask nếu là user
+      } else {
+        toast({
+          title: 'Lỗi role người dùng',
+          description: 'Role không hợp lệ, không thể xác định quyền truy cập.',
+          variant: 'destructive',
+        });
+      }
     } catch (err: any) {
       toast({
         title: 'Đăng nhập thất bại',
@@ -53,11 +66,11 @@ export default function LoginPage() {
         </div>
         <Button type="submit" className="w-full">Đăng nhập</Button>
         <p className="text-center text-sm mt-4">
-        Chưa có tài khoản?{" "}
-        <Link to="/register" className="text-blue-600 hover:underline font-medium">
-          Đăng ký
-        </Link>
-      </p>
+          Chưa có tài khoản?{" "}
+          <Link to="/register" className="text-blue-600 hover:underline font-medium">
+            Đăng ký
+          </Link>
+        </p>
       </form>
     </div>
   );
