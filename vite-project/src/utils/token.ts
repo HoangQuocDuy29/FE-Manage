@@ -1,30 +1,29 @@
-// 📁 FE: src/utils/token.ts
+// File: src/utils/token.ts (NEW)
+const TOKEN_KEY = 'token';
 
-const TOKEN_KEY = 'auth_token';
-
-// Lưu token vào localStorage
 export const setToken = (token: string): void => {
-  if (typeof window !== 'undefined' && token) {
-    localStorage.setItem(TOKEN_KEY, token);
-  }
+  localStorage.setItem(TOKEN_KEY, token);
 };
 
-// Lấy token từ localStorage
 export const getToken = (): string | null => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem(TOKEN_KEY);
-  }
-  return null;
+  return localStorage.getItem(TOKEN_KEY);
 };
 
-// Xóa token khỏi localStorage
-export const clearToken = (): void => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(TOKEN_KEY);
-  }
+export const removeToken = (): void => {
+  localStorage.removeItem(TOKEN_KEY);
 };
 
-// Kiểm tra nếu token có tồn tại trong localStorage
-export const isAuthenticated = (): boolean => {
-  return getToken() !== null;
+export const isTokenValid = (): boolean => {
+  const token = getToken();
+  if (!token) return false;
+  
+  try {
+    // Basic JWT expiry check
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Date.now() / 1000;
+    
+    return payload.exp > currentTime;
+  } catch {
+    return false;
+  }
 };

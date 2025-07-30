@@ -8,6 +8,9 @@ interface User {
   name: string;
   role: 'admin' | 'user';
   avatar?: string;
+  fullName?: string;  // ✅ Thêm
+  roleName?: string;        // ✅ Thêm
+  isAdmin?: boolean;        // ✅ Thêm  
   phone?: string;
   address?: string;
   bio?: string;

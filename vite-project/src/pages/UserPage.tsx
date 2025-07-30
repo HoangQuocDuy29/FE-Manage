@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -41,9 +40,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "@/components/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
 import {
   User,
   Mail,
@@ -62,148 +60,343 @@ import {
   Heart,
   Star,
   TrendingUp,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
-interface User {
+// Import API functions - rename User to ApiUser to avoid conflict
+import { 
+  fetchUsers, 
+  fetchUserStats, 
+  createUser, 
+  updateUser, 
+  deleteUser,
+  fetchUser,
+  searchUsers,
+  handleApiError,
+  type CreateUserData,
+  type UpdateUserData,
+  type UserFilters,
+  type UserStats,
+  type User as ApiUser
+} from '../services/api';
+
+// Local interfaces for this component
+interface UserPageData {
   id: string;
   name: string;
   email: string;
+  username?: string;
+  fullName?: string;
   phone: string;
   address: string;
+  department?: string;
+  position?: string;
+  avatar?: string;
   joinedDate: string;
+  lastLoginDate?: string;
   status: 'active' | 'inactive' | 'suspended';
   role: 'customer' | 'admin';
-  avatar?: string;
+  roleName: string;
+  roleId: number;
   totalOrders: number;
   totalSpent: number;
+  formattedSpending: string;
+  isActive: boolean;
+  isAdmin: boolean;
   lastOrder?: string;
 }
 
-interface Order {
-  id: string;
-  date: string;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+interface PaginationData {
+  page: number;
+  limit: number;
   total: number;
-  items: number;
+  totalPages: number;
 }
 
-interface Address {
-  id: string;
-  type: 'home' | 'work' | 'other';
-  address: string;
-  isDefault: boolean;
-}
-
-interface PaymentMethod {
-  id: string;
-  type: 'card' | 'bank' | 'wallet';
-  last4?: string;
-  bankName?: string;
-  walletType?: string;
-  isDefault: boolean;
+interface ApiResponse {
+  success: boolean;
+  data: {
+    users: ApiUser[];
+    pagination?: PaginationData;
+  };
+  pagination?: PaginationData;
+  message?: string;
 }
 
 export default function UserPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  // State management
+  const [users, setUsers] = useState<UserPageData[]>([]);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserPageData | null>(null);
+  const [editingUser, setEditingUser] = useState<UserPageData | null>(null);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+  
+  // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterRole, setFilterRole] = useState<string>('all');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [limit] = useState(10);
+  
+  // Loading states
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Mock data
+  // Transform API user to component user
+  const transformApiUser = (apiUser: ApiUser): UserPageData => {
+    return {
+      id: apiUser.id,
+      name: apiUser.fullName || apiUser.username || apiUser.email,
+      email: apiUser.email,
+      username: apiUser.username,
+      fullName: apiUser.fullName,
+      phone: apiUser.phone || '',
+      address: `${apiUser.department || ''}, ${apiUser.position || ''}`.replace(/^,\s*|,\s*$/g, '') || 'Không có thông tin',
+      department: apiUser.department,
+      position: apiUser.position,
+      avatar: apiUser.avatar,
+      joinedDate: apiUser.joinedDate,
+      lastLoginDate: apiUser.lastLoginDate,
+      status: apiUser.status,
+      role: apiUser.role === 'admin' ? 'admin' : 'customer',
+      roleName: apiUser.roleName,
+      roleId: apiUser.roleId,
+      totalOrders: apiUser.totalOrders,
+      totalSpent: apiUser.totalSpent,
+      formattedSpending: apiUser.formattedSpending || `${apiUser.totalSpent?.toLocaleString('vi-VN') || 0}₫`,
+      isActive: apiUser.isActive,
+      isAdmin: apiUser.isAdmin,
+    };
+  };
+
+  // Load users with filters
+  const loadUsers = async (page = 1, resetPage = false) => {
+    try {
+      setIsLoading(true);
+      
+      if (resetPage) {
+        page = 1;
+        setCurrentPage(1);
+      }
+
+      const filters: UserFilters = {
+        page,
+        limit,
+        search: searchTerm.trim() || undefined,
+        status: filterStatus !== 'all' ? (filterStatus as any) : undefined,
+        role: filterRole !== 'all' ? (filterRole as any) : undefined,
+      };
+
+      const response = await fetchUsers(filters);
+      
+      if (response.success && response.data) {
+        // Transform API users to component users
+        const transformedUsers: UserPageData[] = response.data.users.map(transformApiUser);
+
+        setUsers(transformedUsers);
+        
+        // Handle pagination - check both possible locations
+        const paginationData = response.data.pagination || response.pagination;
+        if (paginationData) {
+          setCurrentPage(paginationData.page);
+          setTotalPages(paginationData.totalPages);
+          setTotalUsers(paginationData.total);
+        }
+      }
+    } catch (error: any) {
+      const apiError = handleApiError(error);
+      toast({
+        title: "Lỗi",
+        description: apiError.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load user statistics
+  const loadStats = async () => {
+    try {
+      setIsStatsLoading(true);
+      const response = await fetchUserStats();
+      
+      if (response.success) {
+        setStats(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
+  // Initial load
   useEffect(() => {
-    const mockUsers: User[] = [
-      {
-        id: '1',
-        name: 'Nguyễn Văn A',
-        email: 'nguyenvana@email.com',
-        phone: '0901234567',
-        address: '123 Đường ABC, Quận 1, TP.HCM',
-        joinedDate: '2024-01-15',
-        status: 'active',
-        role: 'customer',
-        totalOrders: 12,
-        totalSpent: 5400000,
-        lastOrder: '2024-03-20',
-      },
-      {
-        id: '2',
-        name: 'Trần Thị B',
-        email: 'tranthib@email.com',
-        phone: '0912345678',
-        address: '456 Đường XYZ, Quận 2, TP.HCM',
-        joinedDate: '2024-02-20',
-        status: 'active',
-        role: 'customer',
-        totalOrders: 8,
-        totalSpent: 3200000,
-        lastOrder: '2024-03-18',
-      },
-      {
-        id: '3',
-        name: 'Lê Văn C',
-        email: 'levanc@email.com',
-        phone: '0923456789',
-        address: '789 Đường DEF, Quận 3, TP.HCM',
-        joinedDate: '2023-12-10',
-        status: 'inactive',
-        role: 'customer',
-        totalOrders: 3,
-        totalSpent: 1500000,
-        lastOrder: '2024-01-15',
-      },
-    ];
-    setUsers(mockUsers);
+    loadUsers();
+    loadStats();
   }, []);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.phone.includes(searchTerm);
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    
-    return matchesSearch && matchesStatus && matchesRole;
-  });
+  // Reload when filters change (with debounce for search)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadUsers(1, true);
+    }, searchTerm ? 500 : 0);
 
-  const handleAddUser = (newUser: Omit<User, 'id' | 'joinedDate' | 'totalOrders' | 'totalSpent'>) => {
-    const user: User = {
-      ...newUser,
-      id: Date.now().toString(),
-      joinedDate: new Date().toISOString().split('T')[0],
-      totalOrders: 0,
-      totalSpent: 0,
-    };
-    setUsers([...users, user]);
-    setIsAddUserOpen(false);
-    toast({
-      title: "Thành công",
-      description: "Đã thêm người dùng mới.",
-    });
+    return () => clearTimeout(timer);
+  }, [searchTerm, filterStatus, filterRole]);
+
+  // Handle add user
+  const handleAddUser = async (userData: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    status: string;
+    role: string;
+    password?: string;
+  }) => {
+    try {
+      setIsCreating(true);
+
+      // Parse address to department and position
+      const addressParts = userData.address.split(',').map(part => part.trim());
+      const department = addressParts[0] || '';
+      const position = addressParts[1] || '';
+
+      const createData: CreateUserData = {
+        email: userData.email,
+        password: userData.password || 'temp123456',
+        fullName: userData.name,
+        phone: userData.phone,
+        department,
+        position,
+        roleName: userData.role === 'admin' ? 'admin' : 'user',
+      };
+
+      const response = await createUser(createData);
+      
+      if (response.success) {
+        toast({
+          title: "Thành công",
+          description: "Đã thêm người dùng mới.",
+        });
+        setIsAddUserOpen(false);
+        loadUsers();
+        loadStats();
+      }
+    } catch (error: any) {
+      const apiError = handleApiError(error);
+      toast({
+        title: "Lỗi",
+        description: apiError.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleEditUser = (updatedUser: User) => {
-    setUsers(users.map(user => user.id === updatedUser.id ? updatedUser : user));
-    setIsEditUserOpen(false);
-    toast({
-      title: "Thành công",
-      description: "Đã cập nhật thông tin người dùng.",
-    });
+  // Handle edit user
+  const handleEditUser = async (userData: UserPageData) => {
+    try {
+      setIsUpdating(true);
+
+      // Parse address to department and position
+      const addressParts = userData.address.split(',').map(part => part.trim());
+      const department = addressParts[0] || '';
+      const position = addressParts[1] || '';
+
+      const updateData: UpdateUserData = {
+        fullName: userData.name,
+        phone: userData.phone,
+        department,
+        position,
+        status: userData.status,
+        roleName: userData.role === 'admin' ? 'admin' : 'user',
+      };
+
+      const response = await updateUser(Number(userData.id), updateData);
+      
+      if (response.success) {
+        toast({
+          title: "Thành công",
+          description: "Đã cập nhật thông tin người dùng.",
+        });
+        setIsEditUserOpen(false);
+        loadUsers();
+        loadStats();
+      }
+    } catch (error: any) {
+      const apiError = handleApiError(error);
+      toast({
+        title: "Lỗi",
+        description: apiError.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter(user => user.id !== userId));
-    toast({
-      title: "Thành công",
-      description: "Đã xóa người dùng.",
-    });
+  // Handle delete user
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const response = await deleteUser(Number(userId), false);
+      
+      if (response.success) {
+        toast({
+          title: "Thành công",
+          description: "Đã xóa người dùng.",
+        });
+        loadUsers();
+        loadStats();
+      }
+    } catch (error: any) {
+      const apiError = handleApiError(error);
+      toast({
+        title: "Lỗi",
+        description: apiError.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const getStatusBadge = (status: User['status']) => {
+  // Handle view user details
+  const handleViewUserDetails = async (user: UserPageData) => {
+    try {
+      const response = await fetchUser(Number(user.id));
+      if (response.success) {
+        const transformedUser = transformApiUser(response.data);
+        setSelectedUser(transformedUser);
+      } else {
+        setSelectedUser(user);
+      }
+    } catch (error) {
+      setSelectedUser(user);
+    }
+    setIsUserDetailOpen(true);
+  };
+
+  // Get status badge
+  const getStatusBadge = (status: UserPageData['status']) => {
     const variants = {
       active: { label: 'Hoạt động', className: 'bg-green-100 text-green-800' },
       inactive: { label: 'Không hoạt động', className: 'bg-gray-100 text-gray-800' },
@@ -211,6 +404,13 @@ export default function UserPage() {
     };
     const variant = variants[status];
     return <Badge className={variant.className}>{variant.label}</Badge>;
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('all');
+    setFilterRole('all');
   };
 
   return (
@@ -221,7 +421,10 @@ export default function UserPage() {
           <h1 className="text-3xl font-bold">Quản lý người dùng</h1>
           <p className="text-muted-foreground">Quản lý thông tin khách hàng và nhân viên</p>
         </div>
-        <Button onClick={() => setIsAddUserOpen(true)}>
+        <Button 
+          onClick={() => setIsAddUserOpen(true)}
+          disabled={isLoading || isCreating}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Thêm người dùng
         </Button>
@@ -235,8 +438,16 @@ export default function UserPage() {
             <User className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
-            <p className="text-xs text-muted-foreground">+12% so với tháng trước</p>
+            <div className="text-2xl font-bold">
+              {isStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats?.total || totalUsers
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              +{stats?.newUsers || 0} người trong 30 ngày
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -246,9 +457,15 @@ export default function UserPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users.filter(u => u.status === 'active').length}
+              {isStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats?.active || users.filter(u => u.status === 'active').length
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">85% tổng số người dùng</p>
+            <p className="text-xs text-muted-foreground">
+              {stats?.activePercentage || 0}% tổng số người dùng
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -257,18 +474,30 @@ export default function UserPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div>
+            <div className="text-2xl font-bold">
+              {isStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats?.newUsers || 0
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Trong 30 ngày qua</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tỷ lệ giữ chân</CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Tạm ngưng</CardTitle>
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">92%</div>
-            <p className="text-xs text-muted-foreground">+3% so với tháng trước</p>
+            <div className="text-2xl font-bold">
+              {isStatsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                stats?.suspended || users.filter(u => u.status === 'suspended').length
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Cần xem xét</p>
           </CardContent>
         </Card>
       </div>
@@ -286,11 +515,12 @@ export default function UserPage() {
                 placeholder="Tìm theo tên, email, SĐT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
               <Label>Trạng thái</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus} onValueChange={setFilterStatus} disabled={isLoading}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -304,25 +534,22 @@ export default function UserPage() {
             </div>
             <div className="space-y-2">
               <Label>Vai trò</Label>
-              <Select value={filterRole} onValueChange={setFilterRole}>
+              <Select value={filterRole} onValueChange={setFilterRole} disabled={isLoading}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="customer">Khách hàng</SelectItem>
                   <SelectItem value="admin">Quản trị viên</SelectItem>
+                  <SelectItem value="user">Người dùng</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-end">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('all');
-                  setFilterRole('all');
-                }}
+                onClick={clearFilters}
+                disabled={isLoading}
               >
                 Xóa lọc
               </Button>
@@ -336,90 +563,133 @@ export default function UserPage() {
         <CardHeader>
           <CardTitle>Danh sách người dùng</CardTitle>
           <CardDescription>
-            Hiển thị {filteredUsers.length} người dùng
+            Hiển thị {users.length} người dùng - Trang {currentPage}/{totalPages} (Tổng: {totalUsers})
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Người dùng</TableHead>
-                <TableHead>Liên hệ</TableHead>
-                <TableHead>Ngày tham gia</TableHead>
-                <TableHead>Đơn hàng</TableHead>
-                <TableHead>Chi tiêu</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <Avatar>
-                        <AvatarImage src={user.avatar} />
-                        <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {user.role === 'admin' ? 'Quản trị viên' : 'Khách hàng'}
+          {isLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Đang tải...</span>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">Không tìm thấy người dùng nào</p>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Người dùng</TableHead>
+                    <TableHead>Liên hệ</TableHead>
+                    <TableHead>Ngày tham gia</TableHead>
+                    <TableHead>Đơn hàng</TableHead>
+                    <TableHead>Chi tiêu</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead>Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar>
+                            <AvatarImage src={user.avatar} />
+                            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{user.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {user.role === 'admin' ? 'Quản trị viên' : 'Khách hàng'}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center text-sm">
-                        <Mail className="mr-2 h-3 w-3 text-muted-foreground" />
-                        {user.email}
-                      </div>
-                      <div className="flex items-center text-sm">
-                        <Phone className="mr-2 h-3 w-3 text-muted-foreground" />
-                        {user.phone}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{user.joinedDate}</TableCell>
-                  <TableCell>{user.totalOrders}</TableCell>
-                  <TableCell>{user.totalSpent.toLocaleString('vi-VN')}đ</TableCell>
-                  <TableCell>{getStatusBadge(user.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setIsUserDetailOpen(true);
-                        }}
-                      >
-                        <User className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingUser(user);
-                          setIsEditUserOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <Mail className="mr-2 h-3 w-3 text-muted-foreground" />
+                            {user.email}
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <Phone className="mr-2 h-3 w-3 text-muted-foreground" />
+                            {user.phone || 'N/A'}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{user.joinedDate}</TableCell>
+                      <TableCell>{user.totalOrders}</TableCell>
+                      <TableCell>{user.formattedSpending}</TableCell>
+                      <TableCell>{getStatusBadge(user.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewUserDetails(user)}
+                            disabled={isDeleting}
+                          >
+                            <User className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingUser(user);
+                              setIsEditUserOpen(true);
+                            }}
+                            disabled={isDeleting}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center space-x-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadUsers(currentPage - 1)}
+                    disabled={currentPage === 1 || isLoading}
+                  >
+                    Trước
+                  </Button>
+                  <span className="px-4 py-2 text-sm">
+                    Trang {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadUsers(currentPage + 1)}
+                    disabled={currentPage === totalPages || isLoading}
+                  >
+                    Sau
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -440,8 +710,9 @@ export default function UserPage() {
               email: formData.get('email') as string,
               phone: formData.get('phone') as string,
               address: formData.get('address') as string,
-              status: formData.get('status') as User['status'],
-              role: formData.get('role') as User['role'],
+              status: formData.get('status') as string,
+              role: formData.get('role') as string,
+              password: formData.get('password') as string,
             });
           }}>
             <div className="grid gap-4 py-4">
@@ -454,6 +725,7 @@ export default function UserPage() {
                   name="name"
                   className="col-span-3"
                   required
+                  disabled={isCreating}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -466,6 +738,21 @@ export default function UserPage() {
                   type="email"
                   className="col-span-3"
                   required
+                  disabled={isCreating}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">
+                  Mật khẩu
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  className="col-span-3"
+                  placeholder="Tối thiểu 6 ký tự"
+                  required
+                  disabled={isCreating}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -477,29 +764,32 @@ export default function UserPage() {
                   name="phone"
                   className="col-span-3"
                   required
+                  disabled={isCreating}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="address" className="text-right">
-                  Địa chỉ
+                  Phòng ban, Vị trí
                 </Label>
                 <Input
                   id="address"
                   name="address"
+                  placeholder="IT, Developer"
                   className="col-span-3"
                   required
+                  disabled={isCreating}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">
                   Vai trò
                 </Label>
-                <Select name="role" defaultValue="customer">
+                <Select name="role" defaultValue="user" disabled={isCreating}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="customer">Khách hàng</SelectItem>
+                    <SelectItem value="user">Người dùng</SelectItem>
                     <SelectItem value="admin">Quản trị viên</SelectItem>
                   </SelectContent>
                 </Select>
@@ -508,7 +798,7 @@ export default function UserPage() {
                 <Label htmlFor="status" className="text-right">
                   Trạng thái
                 </Label>
-                <Select name="status" defaultValue="active">
+                <Select name="status" defaultValue="active" disabled={isCreating}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue />
                   </SelectTrigger>
@@ -521,10 +811,24 @@ export default function UserPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddUserOpen(false)}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsAddUserOpen(false)}
+                disabled={isCreating}
+              >
                 Hủy
               </Button>
-              <Button type="submit">Thêm người dùng</Button>
+              <Button type="submit" disabled={isCreating}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Đang tạo...
+                  </>
+                ) : (
+                  'Thêm người dùng'
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -549,8 +853,8 @@ export default function UserPage() {
                 email: formData.get('email') as string,
                 phone: formData.get('phone') as string,
                 address: formData.get('address') as string,
-                status: formData.get('status') as User['status'],
-                role: formData.get('role') as User['role'],
+                status: formData.get('status') as UserPageData['status'],
+                role: formData.get('role') as UserPageData['role'],
               });
             }}>
               <div className="grid gap-4 py-4">
@@ -564,6 +868,7 @@ export default function UserPage() {
                     defaultValue={editingUser.name}
                     className="col-span-3"
                     required
+                    disabled={isUpdating}
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -577,6 +882,7 @@ export default function UserPage() {
                     defaultValue={editingUser.email}
                     className="col-span-3"
                     required
+                    disabled={isUpdating}
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -589,11 +895,12 @@ export default function UserPage() {
                     defaultValue={editingUser.phone}
                     className="col-span-3"
                     required
+                    disabled={isUpdating}
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-address" className="text-right">
-                    Địa chỉ
+                    Phòng ban, Vị trí
                   </Label>
                   <Input
                     id="edit-address"
@@ -601,18 +908,19 @@ export default function UserPage() {
                     defaultValue={editingUser.address}
                     className="col-span-3"
                     required
+                    disabled={isUpdating}
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-role" className="text-right">
                     Vai trò
                   </Label>
-                  <Select name="role" defaultValue={editingUser.role}>
+                  <Select name="role" defaultValue={editingUser.role === 'admin' ? 'admin' : 'user'} disabled={isUpdating}>
                     <SelectTrigger className="col-span-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="customer">Khách hàng</SelectItem>
+                      <SelectItem value="user">Người dùng</SelectItem>
                       <SelectItem value="admin">Quản trị viên</SelectItem>
                     </SelectContent>
                   </Select>
@@ -621,7 +929,7 @@ export default function UserPage() {
                   <Label htmlFor="edit-status" className="text-right">
                     Trạng thái
                   </Label>
-                  <Select name="status" defaultValue={editingUser.status}>
+                  <Select name="status" defaultValue={editingUser.status} disabled={isUpdating}>
                     <SelectTrigger className="col-span-3">
                       <SelectValue />
                     </SelectTrigger>
@@ -634,10 +942,24 @@ export default function UserPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditUserOpen(false)}>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsEditUserOpen(false)}
+                  disabled={isUpdating}
+                >
                   Hủy
                 </Button>
-                <Button type="submit">Lưu thay đổi</Button>
+                <Button type="submit" disabled={isUpdating}>
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    'Lưu thay đổi'
+                  )}
+                </Button>
               </DialogFooter>
             </form>
           )}
@@ -686,8 +1008,13 @@ export default function UserPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Địa chỉ:</span>
-                      <span className="text-sm">{selectedUser.address}</span>
+                      <span className="text-sm font-medium">Phòng ban:</span>
+                      <span className="text-sm">{selectedUser.department || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Vị trí:</span>
+                      <span className="text-sm">{selectedUser.position || 'N/A'}</span>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -697,6 +1024,11 @@ export default function UserPage() {
                       <span className="text-sm">{selectedUser.joinedDate}</span>
                     </div>
                     <div className="flex items-center space-x-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Lần cuối đăng nhập:</span>
+                      <span className="text-sm">{selectedUser.lastLoginDate || 'Chưa có'}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
                       <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Tổng đơn hàng:</span>
                       <span className="text-sm">{selectedUser.totalOrders}</span>
@@ -704,7 +1036,7 @@ export default function UserPage() {
                     <div className="flex items-center space-x-2">
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Tổng chi tiêu:</span>
-                      <span className="text-sm">{selectedUser.totalSpent.toLocaleString('vi-VN')}đ</span>
+                      <span className="text-sm">{selectedUser.formattedSpending}</span>
                     </div>
                   </div>
                 </div>
