@@ -1,7 +1,7 @@
 // 📁 FE: src/App.tsx
 import type { JSX } from 'react'; // Fix lỗi JSX.Element
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import HomePage from '@/pages/DashBoard'; // Trang Admin Dashboard
+import TaskPage from '@/pages/TaskPage'; // Trang TaskPage
 import NotFoundPage from '@/pages/NotFoundPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -33,7 +33,7 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <HomePage />
+                <TaskPage />
               </ProtectedRoute>
             }
           />
@@ -43,7 +43,7 @@ function App() {
             path="/dashboard"
             element={
               <ProtectedAdminRoute>
-                <HomePage />
+                <TaskPage />
               </ProtectedAdminRoute>
             }
           />
